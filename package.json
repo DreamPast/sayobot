@@ -1,0 +1,30 @@
+{
+  "name": "sayobot",
+  "version": "1.0.0",
+  "description": "sayobot",
+  "main": "main.js",
+  "repository": "https://github.com/ChingCdesu/SayobotCore.git",
+  "author": "undefined <masnn0@outlook.com>",
+  "license": "MIT",
+  "dependencies": {
+    "ffi-napi": "^3.0.1",
+    "fs-extra": "^9.0.1",
+    "koishi-utils": "^2.2.0",
+    "mongodb": "^3.6.0",
+    "superagent": "^6.0.0"
+  },
+  "devDependencies": {
+    "@types/ffi-napi": "^2.4.3",
+    "@types/fs-extra": "^9.0.1",
+    "@types/koa-router": "^7.4.1",
+    "@types/mongodb": "^3.5.25",
+    "@types/superagent": "^4.1.9",
+    "koishi-core": "^2.0.0-beta.10",
+    "koishi-plugin-mongo": "^1.0.0-beta.0",
+    "typescript": "^3.9.7"
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "build:watch": "tsc -b --watch"
+  }
+}

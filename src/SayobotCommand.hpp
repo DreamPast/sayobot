@@ -6,7 +6,6 @@
 #define sprintf_s(buffer, length, format, ...) sprintf(buffer, format, __VA_ARGS__)
 #endif
 
-#include <cqcppsdk/cqcppsdk.h>
 #include <math.h>
 #include <sys/stat.h>
 #include <time.h>
@@ -21,8 +20,7 @@
 #include "SayobotException.hpp"
 #include "SayobotHttp.hpp"
 #include "SayobotImage.hpp"
-#include "SayobotMysql.hpp"
-#include "zalgo.hpp"
+#include "osu_api.hpp"
 
 #pragma region path
 #define BACKGROUND_PATH "../png/stat/"
@@ -34,263 +32,162 @@
 #define AVATAR_PATH "../png/avatars/"
 #pragma endregion
 
-#define SAYOBOT_SELF 1394932996
-#define SAYOBOT_GROUP 693190897
-#define COLA 1361262679
-#define SAYOKO 1469708225
-#define DEBUGGER 1415336930
-
 #define BIG_POINTSIZE 54.0
 #define MID_POINTSIZE 43.0
 #define SMALL_POINTSIZE 29.0
 
-using Message = cq::message::Message;
-using MessageSegment = cq::message::MessageSegment;
+#ifndef SAYOBOT_API
+#if defined __WINDOWS__ || defined _WIN32 || defined _WIN64
+#define SAYOBOT_API __declspec(dllexport) // 在Windows上，必须明示导出函数
+#else
+#define SAYOBOT_API
+#endif
+#endif
+
+std::string llToString(int64_t n) {
+    const char digit[4] = {' ', 'K', 'M', 'G'};
+    long double v = n;
+    int a = 0;
+    while (v > 1000.0) {
+        v /= 1000.0;
+        ++a;
+    }
+    char *buf = new char[20];
+    sprintf_s(buf, 20, "%.2Lf", v);
+    std::string ret(buf);
+    delete[] buf;
+    return ret + digit[a];
+}
+
+std::string DoubleRound2(double a) {
+    char *buf = new char[20];
+    sprintf_s(buf, 20, "%.2lf", a);
+    std::string ret(buf);
+    delete[] buf;
+    return ret;
+}
 
 namespace Sayobot {
-    class Sudo {
-    public:
-        Sudo(const std::vector<std::string> list) {
-            if (list.size() == 0) {
-                this->result = "sudo command excepted";
-                return;
-            }
+#define Sayobot_Free(ptr) if(ptr) delete ptr
+    namespace __detail {
+        struct UserConfigData {
+            int32_t user_id;
+            int64_t qq;
+            char* username = nullptr;
+            char* sign = nullptr;
+            char* background = nullptr;
+            struct {
+                char* profile = nullptr;
+                char* data = nullptr;
+                char* sign = nullptr;
+            } edge;
+            /*
+            struct {
+                char* profile = nullptr;
+                char* data = nullptr;
+                char* sign = nullptr;
+                char* time = nullptr;
+                char* arrow = nullptr;
+                char* name = nullptr;
+            } font;*/
+            struct {
+                char* profile = nullptr;
+                char* data = nullptr;
+                char* sign = nullptr;
+                char* time = nullptr;
+                char* arrowup = nullptr;
+                char* arrowdown = nullptr;
+                char* name = nullptr;
+            } color;
+            char* skin = nullptr;
+            int opacity;
+            
+            void destroy() {
+                Sayobot_Free(username);
+                Sayobot_Free(sign);
+                Sayobot_Free(background);
+                Sayobot_Free(skin);
 
-            const std::vector<std::string> sub_type = {"sql", "cmd", "update"};
-            int index;
-            for (index = 0; index < sub_type.size(); ++index) {
-                if (!sub_type[index].compare(list[0])) break;
-            }
+                Sayobot_Free(edge.profile);
+                Sayobot_Free(edge.data);
+                Sayobot_Free(edge.sign);
+                /*
+                Sayobot_Free(font.profile);
+                Sayobot_Free(font.data);
+                Sayobot_Free(font.sign);
+                Sayobot_Free(font.time);
+                Sayobot_Free(font.arrow);
+                Sayobot_Free(font.name);
+                */
 
-            if (index == sub_type.size()) {
-                char buffer[128];
-                sprintf_s(
-                    buffer, 128, "no sudo command named \"%s\"", list[0].c_str());
-                throw Sayobot::BaseException(buffer, Sayobot::COMMAND_NOT_FOUND);
+                Sayobot_Free(color.profile);
+                Sayobot_Free(color.data);
+                Sayobot_Free(color.sign);
+                Sayobot_Free(color.time);
+                Sayobot_Free(color.arrowup);
+                Sayobot_Free(color.arrowdown);
+                Sayobot_Free(color.name);
             }
+        };
+        
+        struct UserStatData {
+            int32_t user_id;
+            int64_t qq;
+            char* username = nullptr;
+            int64_t total_score, ranked_score;
+            int32_t total_hit;
+            double accuracy;
+            float pp, level;
+            int32_t global_rank, country_rank;
+            char* country = nullptr;
+            int64_t playcount;
+            int32_t xh, x, sh, s, a;
+            time_t update_timestamp;
+            osu_api::mode mode;
+            unsigned days;
 
-            this->args.clear();
-            for (auto it = list.begin() + 1; it != list.end(); ++it) {
-                this->args.push_back(*it);
-            }
+            void destroy() {
+                Sayobot_Free(username);
+                Sayobot_Free(country);
+            };
+        };
 
-            switch (index) {
-            case 0:
-                SqlOperation();
-                break;
-            case 1:
-                CmdOperation();
-                break;
-            case 2:
-                ManualUpdate();
-                break;
-            default:
-                break;
+        struct user_info {
+            int user_id;
+            char* username = nullptr;
+            long registed_timestamp;
+            int n300, n100, n50;
+            int playcount;
+            int64_t total_score, ranked_score;
+            int64_t total_hits;
+            float pp;
+            int country_rank, global_rank;
+            int count_ssh, count_ss, count_sh, count_s, count_a;
+            int playtime;
+            float level;
+            double accuracy;
+            char* country = nullptr;
+
+            void destory() {
+                Sayobot_Free(username);
+                Sayobot_Free(country);
             }
         }
 
-        std::string GetResult() {
-            return this->result;
+        enum mode_enum { std = 0, taiko, ctb, mania };
+
+        struct UserPanelData {
+            mode_enum mode;
+            user_info uinfo;
+            UserConfigData config;
+            UserStatData stat;
+            int compareDays;
+        };
+
+        char* MakePersonalCard(const UserPanelData* data, const char* path) {
+
         }
-
-    private:
-        std::string result;
-        std::vector<std::string> args;
-
-    private:
-        void SqlOperation() {
-            auto db = Sayobot::Database::GetInstance();
-            cq::utils::string_trim(this->args[0]);
-            std::string type = this->args[0].substr(0, 6);
-            std::transform(type.begin(), type.end(), type.begin(), ::tolower);
-
-            if (!type.compare("select")) {
-                json res = db->Select(this->args[0]);
-                this->result = res.dump(2);
-            } else {
-                db->Execute(this->args[0]);
-                this->result = "数据库更新成功";
-            }
-            // cq::utils::string_trim(this->result);
-        }
-
-        void CmdOperation() {
-            // this->result = "not supported yet";
-            // return;
-            cq::utils::string_trim(this->args[0]);
-            this->result = ExecCommand(this->args[0]);
-            this->result = cq::utils::string_convert_encoding(
-                this->result, "gb2312", "utf-8", 2.0f);
-        }
-
-        void ManualUpdate() {
-            const std::vector<char> mode_str = {'o', 't', 'c', 'm'};
-            if (1 != this->args[this->args.size() - 1].size()) {
-                throw Sayobot::InvaildArgumentException(
-                    "sudo update", "invaild mode char", Sayobot::INVAILD_MODE);
-            }
-            int mode_num;
-            for (mode_num = 0; mode_num < 4; ++mode_num) {
-                if (mode_str[mode_num] == this->args[this->args.size() - 1][0]) break;
-            }
-            if (4 == mode_num) {
-                throw Sayobot::InvaildArgumentException(
-                    "sudo update", "invaild mode char", Sayobot::INVAILD_MODE);
-            }
-            this->args.pop_back();
-            std::string qq_or_nick = "";
-            for (auto it = this->args.begin(); it != this->args.end(); ++it) {
-                qq_or_nick += *it;
-                qq_or_nick += ' ';
-            }
-
-            auto db = Sayobot::Database::GetInstance();
-            char *buffer = new char[1024];
-            sprintf_s(buffer,
-                      1024,
-                      "select userid from userconfig where nick=\'%s\' or qq=\'%s\'",
-                      qq_or_nick.c_str(),
-                      qq_or_nick.c_str());
-            json data;
-            try {
-                data = db->Select(buffer)[0];
-            } catch (Sayobot::QueryException &ex) {
-                if (1065 == ex.Code())
-                    throw UserNotFound("这个人好像没有绑定",
-                                       Sayobot::USER_OTHER_NOT_SET);
-                else
-                    throw ex;
-            }
-
-            std::string userid = data["userid"].get<std::string>();
-            osu_api::user_info ui;
-            osu_api::api_v1::GetUser(userid, (osu_api::mode)mode_num, &ui);
-
-            data["TotalHits"] =
-                std::to_string(std::stoll(data["count300"].get<std::string>())
-                               + std::stoll(data["count100"].get<std::string>())
-                               + std::stoll(data["count50"].get<std::string>()));
-
-            sprintf_s(buffer,
-                      1024,
-                      "insert into userstats values (%d,\'%s\',%lld,%lld,%lld,%lf"
-                      ",%f,%d,%d,%d,%d,%d,%d,%d,%d,%f,\'%c\',now())",
-                      ui.user_id,
-                      ui.country.c_str(),
-                      ui.total_hits,
-                      ui.total_score,
-                      ui.ranked_score,
-                      ui.accuracy,
-                      ui.pp,
-                      ui.global_rank,
-                      ui.country_rank,
-                      ui.count_ssh,
-                      ui.count_ss,
-                      ui.count_sh,
-                      ui.count_s,
-                      ui.count_a,
-                      ui.playcount,
-                      ui.level,
-                      mode_str[mode_num]);
-            db->Insert(buffer);
-            this->result = "更新完成";
-
-            delete[] buffer;
-        }
-
-        static std::string ExecCommand(const std::string &cmd) {
-            std::string ret = "";
-#ifdef WIN32
-            const size_t MAX_READ_SIZE = 10240;
-            SECURITY_ATTRIBUTES sa;
-            ZeroMemory(&sa, sizeof(sa));
-            sa.nLength = sizeof(sa);
-            sa.bInheritHandle = TRUE;
-            sa.lpSecurityDescriptor = NULL;
-
-            HANDLE hReadPipe, hWritePipe;
-            if (!::CreatePipe(&hReadPipe, &hWritePipe, &sa, MAX_READ_SIZE)) {
-                throw Sayobot::BaseException("Cannot create pipe",
-                                             Sayobot::BROKEN_PIPE);
-            }
-
-            STARTUPINFO si;
-            ZeroMemory(&si, sizeof(si));
-            si.cb = sizeof(si);
-            si.wShowWindow = SW_HIDE;
-            si.dwFlags = STARTF_USESTDHANDLES | STARTF_USESHOWWINDOW;
-            si.hStdError = hWritePipe;
-            si.hStdOutput = hWritePipe;
-
-            PROCESS_INFORMATION pi;
-            ZeroMemory(&pi, sizeof(pi));
-
-            if (CreateProcess(NULL,
-                              (LPSTR)cmd.c_str(),
-                              NULL,
-                              NULL,
-                              TRUE,
-                              0,
-                              NULL,
-                              NULL,
-                              &si,
-                              &pi)) {
-                if (WAIT_TIMEOUT != WaitForSingleObject(pi.hProcess, 10000)) {
-                    DWORD dwReadLen = 0;
-                    DWORD dwStdLen = 0;
-                    if (PeekNamedPipe(hReadPipe, NULL, 0, NULL, &dwReadLen, NULL)
-                        && dwReadLen > 0) {
-                        char szPipeOut[MAX_READ_SIZE];
-                        ZeroMemory(szPipeOut, MAX_READ_SIZE);
-                        if (ReadFile(
-                                hReadPipe, szPipeOut, dwReadLen, &dwStdLen, NULL)) {
-                            ret += szPipeOut;
-                        }
-                    } else {
-                        ret = "No result";
-                    }
-                } else {
-                    ret = "cmd.exe time out";
-                }
-                if (pi.hProcess) CloseHandle(pi.hProcess);
-                if (pi.hThread) CloseHandle(pi.hThread);
-            } else {
-                ret = "cannot execute command, error code: "
-                      + std::to_string(GetLastError());
-            }
-            CloseHandle(hReadPipe);
-            CloseHandle(hWritePipe);
-
-            // FILE *fp = NULL;
-            // fp = _popen(cmd.c_str(), "r");
-            //
-            // if (!fp)
-            //{
-            //    throw Sayobot::BaseException("Failed to create command pipe", 2);
-            //}
-            // char buffer[1024];
-            // while (fgets(buffer, sizeof(buffer), fp) != NULL)
-            //{
-            //    ret += buffer;
-            //}
-            //_pclose(fp);
-#else
-
-            FILE *fp = NULL;
-            fp = popen(cmd.c_str(), "r");
-
-            if (!fp) {
-                throw Sayobot::BaseException("Failed to create command pipe", 2);
-            }
-            char buffer[1024];
-            while (fgets(buffer, sizeof(buffer), fp) != NULL) {
-                ret += buffer;
-            }
-            pclose(fp);
-#endif
-            return ret;
-        }
-    };
+    }
 
     struct UserPanelData {
         osu_api::mode mode;
@@ -302,293 +199,7 @@ namespace Sayobot {
 
     class Command {
     public:
-        /*
-         * 指令类
-         * 把指令头！去掉后剩下部分传入
-
-         * 基本使用：
-         * std::string result;
-          try
-          {
-               result = Sayobot::Command(str, qq, group, e.target).GetResult();
-               cq::send_message(e.target, result);
-          }
-          catch (Sayobot::BaseException &ex)
-          {
-               (异常处理...)
-          }
-        */
-        Command(const std::string &Command, int64_t sender, int64_t group,
-                cq::Target target) {
-            this->sender = sender;
-            this->group = group;
-            this->target = target;
-
-            std::string com = Command;
-            cq::utils::string_trim(com);
-
-            std::stringstream ss(com);
-            this->args.clear();
-            ss >> this->cmd;
-
-            int cIndex = this->CommandIndex();
-            if (cIndex != Command::Commands.size()) {
-                while (!ss.eof()) {
-                    std::string argBuffer;
-                    ss >> argBuffer;
-                    if (argBuffer[0] == '{') {
-                        char c;
-                        do {
-                            if (argBuffer[argBuffer.size() - 1] == '}') {
-                                break;
-                            }
-                            if (ss.eof()) {
-                                throw Sayobot::InvaildArgumentException(
-                                    "Parse Command",
-                                    "阁下的命令还没写完呢 (记得加“}”)",
-                                    Sayobot::INCOMPLETE_COMMAND);
-                            }
-                            ss.get(c);
-                            argBuffer += c;
-                        } while (c != '}');
-                        argBuffer = argBuffer.substr(1, argBuffer.size() - 2);
-                    }
-                    if (!argBuffer.empty()) {
-                        cq::message::unescape(argBuffer);
-                        this->args.push_back(argBuffer);
-                    }
-                }
-
-                this->execute(this, cIndex);
-            } else {
-                this->result = "";
-            }
-        }
-
-        std::string GetResult() {
-            return this->result;
-        }
-
-    private:
-        const static std::vector<std::string> Commands;
-        const static std::set<int64_t> sudoers;
-        std::string cmd;
-        std::vector<std::string> args;
-        std::string result;
-        int64_t sender;
-        int64_t group;
-        cq::Target target;
-
-    private:
-        static void execute(Sayobot::Command *ptr, int index) {
-            ptr->result.clear();
-            const std::vector<void (Sayobot::Command::*)()> funcs = {
-                &Sayobot::Command::UserSet,
-                &Sayobot::Command::UserUnset,
-                &Sayobot::Command::Help,
-                &Sayobot::Command::UpdateEdge,
-                &Sayobot::Command::UpdateSign,
-                &Sayobot::Command::UpdateBackground,
-                &Sayobot::Command::UpdateOpacity,
-                &Sayobot::Command::UpdateAvatar,
-                &Sayobot::Command::Roll,
-                &Sayobot::Command::Report,
-                &Sayobot::Command::Reset,
-                &Sayobot::Command::sudo,
-                &Sayobot::Command::groupSleep,
-                &Sayobot::Command::Recommend,
-                &Sayobot::Command::zalgo};
-
-            if (index >= 0 && index <= 3)
-                ptr->UserStat(index);
-            else {
-                (ptr->*funcs[index - 4])();
-            }
-        }
-
-        int CommandIndex() {
-            int ret = 0;
-            for (auto it = Sayobot::Command::Commands.begin();
-                 it != Sayobot::Command::Commands.end();
-                 ++it) {
-                if (0 == this->cmd.compare(*it)) break;
-                ++ret;
-            }
-            return ret;
-        }
-
-        void UserStat(int mode) {
-            const char mode_str[4] = {'o', 't', 'c', 'm'};
-            auto db = Sayobot::Database::GetInstance();
-            int ret;
-            UserPanelData panelData;
-            panelData.compareDays = 0;
-            panelData.config = {0};
-            panelData.mode = (osu_api::mode)mode;
-            panelData.stat = {0};
-            panelData.uinfo = {0};
-
-            if (0 != this->args.size()
-                && this->args[this->args.size() - 1][0] == '#') {
-                try {
-                    panelData.compareDays =
-                        std::stoul(this->args[this->args.size() - 1].substr(1));
-                    this->args.pop_back();
-                } catch (std::invalid_argument) {
-                    throw Sayobot::InvaildArgumentException(
-                        this->cmd, "天数必须是数字哦", Sayobot::INVAILD_DAY);
-                }
-            }
-            std::string nick;
-            // 组合nick
-            for (auto it = this->args.begin(); it != this->args.end(); ++it) {
-                nick += *it;
-                nick += ' ';
-            }
-            nick = nick.substr(0, nick.size() - 1);
-
-            if (0 == this->args.size()) {
-                ret = db->GetUserConfig(this->sender, panelData.config);
-                if (1065 == ret) {
-                    throw UserNotFound("阁下还没绑定哦，用set把阁下的名字告诉我吧",
-                                       Sayobot::USER_SELF_NOT_SET);
-                } else if (0 != ret) {
-                }
-
-                ret = db->GetUserStatus(this->sender,
-                                        panelData.compareDays,
-                                        mode_str[mode],
-                                        panelData.stat);
-
-                if (1065 == ret && 0 != panelData.compareDays) {
-                    throw Sayobot::BaseException(
-                        "小夜没有查到阁下" + std::to_string(panelData.compareDays)
-                            + "天前的信息",
-                        Sayobot::NO_DAILY_DATA);
-                } else if (0 != ret) {
-                    panelData.stat.user_id = -1;
-                }
-            } else {
-                const std::regex cqCodeRegex(
-                    "^\\[ ?CQ ?: ?at ?, ?qq ?= ?(\\d+) ?\\] ?$",
-                    std::regex_constants::ECMAScript | std::regex_constants::icase);
-                // 判断CQ码
-                if (std::regex_search(nick, cqCodeRegex)) {
-                    auto it =
-                        std::sregex_iterator(nick.begin(), nick.end(), cqCodeRegex);
-                    std::string qq_str = (*it)[1].str();
-                    int64_t qq = std::stoll(qq_str);
-
-                    ret = db->GetUserConfig(qq, panelData.config);
-                    if (1065 == ret) {
-                        throw UserNotFound("小夜还不认识这个人哦，阁下把他介绍给我吧",
-                                           Sayobot::USER_OTHER_NOT_SET);
-                    } else if (0 != ret) {
-                    }
-
-                    ret = db->GetUserStatus(
-                        qq, panelData.compareDays, mode_str[mode], panelData.stat);
-
-                    if (1065 == ret && 0 != panelData.compareDays) {
-                        throw Sayobot::BaseException(
-                            "小夜没有查到阁下" + std::to_string(panelData.compareDays)
-                                + "天前的信息",
-                            Sayobot::NO_DAILY_DATA);
-                    } else if (0 != ret) {
-                        panelData.stat.user_id = -1;
-                    }
-
-                } else {
-                    ret = db->GetUserConfig(nick, panelData.config);
-                    if (1065 == ret) {
-                        db->GetUserConfig(-1, panelData.config);
-                    }
-                    ret = db->GetUserStatus(
-                        nick, panelData.compareDays, mode_str[mode], panelData.stat);
-
-                    if (1065 == ret && 0 != panelData.compareDays) {
-                        throw Sayobot::BaseException(
-                            "小夜没有查到这个人"
-                                + std::to_string(panelData.compareDays) + "天前的信息",
-                            Sayobot::NO_DAILY_DATA);
-                    } else if (0 != ret) {
-                        panelData.stat.user_id = -1;
-                    }
-                }
-            }
-            if (panelData.config.user_id == -1) {
-                panelData.config.username = nick;
-            }
-            osu_api::api_v1::GetUser(
-                panelData.config.username, (osu_api::mode)mode, &panelData.uinfo);
-            if (panelData.uinfo.playcount == 0) {
-                if (this->sender != panelData.config.qq)
-                    throw Sayobot::UserNotFound(
-                        "阁下还没有玩过这个模式哦，赶紧去试试吧",
-                        Sayobot::USER_SELF_NOT_PLAYED);
-                else
-                    throw Sayobot::UserNotFound("这个人还没有玩过这个模式哦",
-                                                Sayobot::USER_OTHER_NOT_PLAYED);
-            }
-
-            MakePersonalCard(panelData);
-        }
-
-        void UserSet() {
-            std::string nick;
-            if (1 != this->args.size()) {
-                for (auto it = this->args.begin(); it != this->args.end(); ++it) {
-                    nick += *it;
-                    nick += ' ';
-                }
-                nick = nick.substr(0, nick.size() - 1);
-            } else {
-                nick = this->args[0];
-            }
-
-            osu_api::user_info info;
-            osu_api::api_v1::GetUser(nick, osu_api::mode::std, &info);
-            auto db = Sayobot::Database::GetInstance();
-            db->NewUser(this->sender, info.username, info.user_id);
-
-            this->result =
-                "阁下绑定成功啦，发送指令！o就可以查看阁下的资料卡。还有其"
-                "他指令阁下可以通过help查看哦";
-        }
-
-        void UserUnset() {
-            auto db = Sayobot::Database::GetInstance();
-            if (!db->UserExist(this->sender)) {
-                throw Sayobot::UserNotFound("阁下还没绑定哦",
-                                            Sayobot::USER_SELF_NOT_SET);
-            }
-            db->UserUnset(this->sender);
-
-            this->result =
-                "啊咧咧，，阁下你叫什么名字呀，突然不记得了，快用 !set 告诉我吧";
-        }
-
-        void Help() {
-            if (0 == this->args.size()) {
-                this->result = MessageSegment::image("pic/Sayobot help.png");
-            } else if (1 == this->args.size()) {
-                const std::set<std::string> help_args = {
-                    "框框", "背景", "个签", "大括号", "all"};
-                if (0 == help_args.count(this->args[0])) {
-                    throw Sayobot::InvaildArgumentException(
-                        "help", "没有这个帮助的图片哦", Sayobot::NO_HELP_PIC);
-                }
-                char buffer[128];
-                sprintf_s(buffer, 128, "pic/help-%s.png", this->args[0].c_str());
-                this->result = MessageSegment::image(buffer);
-            } else {
-                throw Sayobot::InvaildArgumentsCount("help",
-                                                     "help可以有0个或者1个参数哦阁下",
-                                                     Sayobot::INVAILD_ARGUMENT_COUNT);
-            }
-        }
-
-        void MakePersonalCard(const UserPanelData &data) {
+        char *MakePersonalCard(const UserPanelData &data) {
             const std::vector<std::string> mode_str = {"/mode-osu-med.png",
                                                        "/mode-taiko-med.png",
                                                        "/mode-fruits-med.png",
@@ -625,15 +236,6 @@ namespace Sayobot {
             image.DrawPic(stemp, 125, 570, 825, 150);
             // 绘制头像
             sprintf_s(stemp, 512, AVATAR_PATH "%d.png", data.uinfo.user_id);
-            if (!fileExist(stemp)) {
-                std::default_random_engine random(time(NULL));
-                std::uniform_int_distribution<int> dist(100000, 900000);
-                sprintf_s(stemp,
-                          512,
-                          "https://a.ppy.sh/%d?%d.png",
-                          data.uinfo.user_id,
-                          dist(random));
-            }
             try {
                 image.DrawPic(stemp, 165, 150, 350, 350);
             } catch (Magick::Exception &ex) {
@@ -870,571 +472,8 @@ namespace Sayobot {
             std::string hash = image.GetRandomHash();
             std::string filename = "data/image/" + hash + ".jpg";
             image.Save(filename);
-            this->result = MessageSegment::image(hash + ".jpg");
-        }
-
-        void UpdateEdge() {
-            const std::vector<std::string> fields = {
-                "ProfileEdge", "DataEdge", "SignEdge"};
-            const std::vector<std::string> fontColors = {
-                "ProfileFontColor", "DataFontColor", "SignFontColor"};
-
-            if (2 != this->args.size())
-                throw Sayobot::InvaildArgumentsCount("更新框框",
-                                                     "更新框框有2个参数哦阁下",
-                                                     Sayobot::INVAILD_ARGUMENT_COUNT);
-            int index;
-            try {
-                index = std::stoi(this->args[0]);
-                if (index > 2 || index < 0) throw std::exception();
-            } catch (...) {
-                throw Sayobot::InvaildArgumentException(
-                    "更新框框",
-                    "更新框框第1个参数是0-2的数字哦阁下",
-                    Sayobot::EDGE_NOT_FOUND);
-            }
-            std::string filename = this->args[1] + (0 == index ? "0.png" : "1.png");
-            std::string filepath = EDGE_PATH + filename;
-            if (!fileExist(filepath))
-                throw Sayobot::FileNotFound("没有这个框框哦阁下",
-                                            Sayobot::EDGE_NOT_FOUND);
-            // 获取字体颜色
-            std::string color;
-            std::ifstream colorFile(EDGE_PATH + this->args[1] + "0.col");
-            if (colorFile.is_open()) {
-                colorFile >> color;
-                color = "#" + color;
-            } else {
-                color = "default";
-            }
-            int ret;
-            auto db = Sayobot::Database::GetInstance();
-            if (!db->UserExist(this->sender)) {
-                throw Sayobot::UserNotFound(
-                    "阁下还没绑定哦，用set把阁下的名字告诉我吧",
-                    Sayobot::USER_SELF_NOT_SET);
-            }
-            if (color.compare("default")) {
-                ret = db->UserChangeConfig(this->sender, fontColors[index], color);
-            } else {
-                ret = db->UserResetConfig(this->sender, fontColors[index]);
-            }
-            ret = db->UserChangeConfig(this->sender, fields[index], filename);
-
-            if (ret == 0) {
-                if (0 == this->group) {
-                    this->result = "更新成功";
-                } else {
-                    this->result = "更新成功，阁下查看私聊哦";
-                }
-            } else {
-                this->result = "更新失败惹";
-            }
-        }
-
-        void UpdateSign() {
-            if (1 != this->args.size())
-                throw Sayobot::InvaildArgumentsCount("更新个签",
-                                                     "更新个签有1个参数哦阁下",
-                                                     Sayobot::INVAILD_ARGUMENT_COUNT);
-
-            auto db = Sayobot::Database::GetInstance();
-            if (!db->UserExist(this->sender)) {
-                throw Sayobot::UserNotFound(
-                    "阁下还没绑定哦，用set把阁下的名字告诉我吧",
-                    Sayobot::USER_SELF_NOT_SET);
-            }
-            cq::utils::string_replace(this->args[0], "\'", "\\\'");
-            int ret = db->UserChangeConfig(this->sender, "Sign", this->args[0]);
-
-            if (0 == ret) {
-                if (0 == this->group) {
-                    this->result = "更新成功";
-                } else {
-                    this->result = "更新成功，阁下查看私聊哦";
-                }
-            } else {
-                this->result = "更新失败惹";
-            }
-        }
-
-        void UpdateBackground() {
-            if (1 != this->args.size())
-                throw Sayobot::InvaildArgumentsCount("更换背景",
-                                                     "更换背景有1个参数哦阁下",
-                                                     Sayobot::INVAILD_ARGUMENT_COUNT);
-            std::string filename = this->args[0] + ".png";
-            if (!fileExist(BACKGROUND_PATH + filename))
-                throw Sayobot::FileNotFound("没有这个背景哦阁下",
-                                            Sayobot::BACKGROUND_NOT_FOUND);
-            auto db = Sayobot::Database::GetInstance();
-            if (!db->UserExist(this->sender)) {
-                throw Sayobot::UserNotFound(
-                    "阁下还没绑定哦，用set把阁下的名字告诉我吧",
-                    Sayobot::USER_SELF_NOT_SET);
-            }
-            db->UserChangeConfig(this->sender, "Background", filename);
-
-            if (0 == this->group) {
-                this->result = "更新成功";
-            } else {
-                this->result = "更新成功，阁下查看私聊哦";
-            }
-        }
-
-        void UpdateOpacity() {
-            if (1 != this->args.size())
-                throw Sayobot::InvaildArgumentsCount("更改透明度",
-                                                     "更改透明度有1个参数哦阁下",
-                                                     Sayobot::INVAILD_ARGUMENT_COUNT);
-            int opacity;
-            try {
-                opacity = std::stoi(this->args[0]);
-                if (opacity < 0 || opacity > 100) throw std::exception();
-                if (opacity % 5) throw std::exception();
-            } catch (...) {
-                throw Sayobot::InvaildArgumentException(
-                    "更改透明度",
-                    "更改透明度第1个参数是0-100以内可被5整除的数字哦阁下",
-                    Sayobot::INVAILD_OPACITY);
-            }
-
-            auto db = Sayobot::Database::GetInstance();
-            if (!db->UserExist(this->sender)) {
-                throw Sayobot::UserNotFound(
-                    "阁下还没绑定哦，用set把阁下的名字告诉我吧",
-                    Sayobot::USER_SELF_NOT_SET);
-            }
-            db->UserChangeConfig(this->sender, "Opacity", this->args[0]);
-
-            if (0 == this->group) {
-                this->result = "更新成功";
-            } else {
-                this->result = "更新成功，阁下查看私聊哦";
-            }
-        }
-
-        void UpdateAvatar() {
-            std::default_random_engine random(time(NULL));
-            std::uniform_int_distribution<int> dist(100000, 900000);
-            char temp[512];
-            auto db = Sayobot::Database::GetInstance();
-            UserConfigData config = {0};
-            int ret = db->GetUserConfig(this->sender, config);
-
-            if (1065 == ret) {
-                throw Sayobot::UserNotFound(
-                    "阁下还没绑定哦，用set把阁下的名字告诉我吧",
-                    Sayobot::USER_SELF_NOT_SET);
-            }
-            sprintf_s(
-                temp, 512, "https://a.ppy.sh/%d?%d.png", config.user_id, dist(random));
-            std::string path = AVATAR_PATH + std::to_string(config.user_id) + ".png";
-            try {
-                Sayobot::NetConnection::Download(temp, path);
-                this->result =
-                    "更新头像完成，如果阁下的头像还是没有更新，等一会再试试吧";
-            } catch (Magick::Exception) {
-                this->result = "阁下好像没有游戏头像呢qwq";
-            }
-        }
-
-        void Roll() {
-            long long ret = 0;
-            long long min = 0;
-            long long max = 0;
-            size_t pos;
-            std::random_device rd;
-            std::default_random_engine random(rd());
-            this->result = "";
-            switch (this->args.size()) {
-            case 0: {
-                std::uniform_int_distribution<int> dist(1, 100);
-                this->result = std::to_string(dist(random));
-                break;
-            }
-            case 1: {
-                try {
-                    max = std::stoll(this->args[0], 0, 0);
-                } catch (std::out_of_range) {
-                    this->result = "数字太大了啦，小夜算不过来惹TAT";
-                    break;
-                } catch (...) {
-                    max = 100;
-                }
-                if (this->args[0] != std::to_string(max)) {
-                    pos = this->args[0].find(u8"还是");
-                    if (pos != std::string::npos && pos > 0
-                        && pos + 6 < this->args[0].length()) {
-                        if (rd() % 2) {
-                            this->result = this->args[0].substr(0, pos);
-                        } else {
-                            this->result = this->args[0].substr(pos + 6);
-                        }
-                    } else if (this->args[0].size() > 4
-                               && (pos = this->args[0].find(u8"不"))
-                                      != std::string::npos
-                               && this->args[0].find(this->args[0].substr(pos + 3, 1))
-                                      < pos) {
-                        if (rd() % 2)
-                            this->result = "小夜觉得" + this->args[0].substr(pos + 3);
-                        else
-                            this->result =
-                                "小夜觉得不" + this->args[0].substr(pos + 3);
-                    } else if (this->args[0][1] == '~' && this->args[0].length() >= 3
-                               && args[0][0] < args[0][2]) {
-                        char buf[4];
-                        std::uniform_int_distribution<short> dist(args[0][0],
-                                                                  args[0][2]);
-                        buf[0] = dist(random);
-                        buf[1] = 0;
-                        this->result = buf;
-                    }
-                    break;
-                }
-
-                if (max > 1) {
-                    std::uniform_int_distribution<long long> dist(1, max);
-                    this->result = std::to_string(dist(random));
-                    break;
-                }
-                if (max < 0) {
-                    std::uniform_int_distribution<long long> dist(0, abs(max));
-                    this->result = std::to_string(dist(random) + max);
-                    break;
-                }
-                this->result = "说实话咱也看不懂阁下到底想做什么i";
-                break;
-            }
-            case 2: {
-                try {
-                    min = std::stoll(this->args[0], 0, 0);
-                    max = std::stoll(this->args[1], 0, 0);
-                } catch (...) {
-                    min = 0;
-                    max = 0;
-                }
-                if (min < max && this->args[0] == std::to_string(min)
-                    && this->args[1] == std::to_string(max)) {
-                    std::uniform_int_distribution<int64_t> dist(min, max);
-                    this->result = std::to_string(dist(random));
-                } else {
-                    if (args[0] != args[1]) {
-                        std::uniform_int_distribution<int> dist(0,
-                                                                this->args.size() - 1);
-                        this->result = "当然是" + this->args[dist(random)] + "啦";
-                    } else {
-                        this->result = "这到底是为什么呢";
-                    }
-                }
-                break;
-            }
-            default:
-                break;
-            }
-            if (!this->result.length()) {
-                this->result = "???这个东西好像并不能roll";
-            }
-            if ((pos = this->result.find(u8"我")) != std::string::npos) {
-                this->result.replace(pos, 3, u8"你");
-            }
-            if ((pos = this->result.find(u8"？")) != std::string::npos) {
-                this->result.replace(pos, 3, u8"！");
-            }
-            if ((pos = this->result.find(u8"吗")) != std::string::npos) {
-                this->result.erase(pos, 3);
-            }
-            if ((pos = this->result.find(u8"呢")) != std::string::npos) {
-                this->result.erase(pos, 3);
-            }
-            if ((pos = this->result.find(u8"嘛")) != std::string::npos) {
-                this->result.erase(pos, 3);
-            }
-            return;
-        }
-
-        void Recommend() {
-            int mode = 1;
-            const std::vector<char> mode_char = {'o', 't', 'c', 'm'};
-            int64_t qq = this->sender;
-            std::string nick = "";
-            auto db = Sayobot::Database::GetInstance();
-            json pp_diff_json;
-            UserStatData now_stat;
-            double diff_pp, now_pp;
-            double min_diff, max_diff;
-
-            if (0 != this->args.size()) {
-                if (1 == this->args[this->args.size() - 1].length()) {
-                    char c_mode = this->args[this->args.size() - 1][0];
-                    for (; mode < 5; ++mode) {
-                        if (c_mode == mode_char[mode - 1]) break;
-                    }
-                    if (mode > 4)
-                        mode = 1;
-                    else
-                        this->args.pop_back();
-                }
-
-                for (auto it = this->args.begin(); it != this->args.end(); ++it)
-                    nick += (*it);
-
-                if (this->args.size() != 0) qq = 0;
-                const std::regex cqCodeRegex(
-                    "^\\[CQ:at,qq=(\\d+)\\]$",
-                    std::regex_constants::ECMAScript | std::regex_constants::icase);
-
-                if (std::regex_match(nick, cqCodeRegex)) {
-                    auto it =
-                        std::sregex_iterator(nick.begin(), nick.end(), cqCodeRegex);
-                    qq = std::stoll((*it)[1].str());
-                }
-            }
-
-            try {
-                char query[512];
-                sprintf_s(query,
-                          512,
-                          "select * from user_pp_diff where %s=\'%s\' and mode=\'%c\'",
-                          qq ? "qq" : "nick",
-                          qq ? std::to_string(qq).c_str() : nick.c_str(),
-                          mode_char[mode - 1]);
-                try {
-                    pp_diff_json = db->Select(query)[0];
-                } catch (Sayobot::QueryException &ex) {
-                    pp_diff_json["diff_pp"] = "0.0";
-                }
-                if (qq) {
-                    db->GetUserLatestedStatus(qq, mode_char[mode - 1], now_stat);
-                } else {
-                    db->GetUserLatestedStatus(nick, mode_char[mode - 1], now_stat);
-                }
-            } catch (Sayobot::QueryException &ex) {
-                if (ex.Code() == 1065) {
-                    if (qq == this->sender)
-                        throw BaseException(
-                            "阁下还没绑定哦，用set把阁下的名字告诉我吧",
-                            Sayobot::USER_SELF_NOT_SET);
-                    else
-                        throw BaseException("小夜还不认识这个人哦，阁下把他介绍给我吧",
-                                            Sayobot::USER_OTHER_NOT_SET);
-                } else
-                    throw ex;
-            }
-            diff_pp = std::stof(pp_diff_json["diff_pp"].get<std::string>());
-            now_pp = now_stat.pp;
-            min_diff = pow(now_pp, 0.4) * 0.195 * 0.95;
-            max_diff = pow(now_pp, 0.4) * 0.195 + pow(diff_pp, 0.4) * 0.15;
-            json post_data = json::object({});
-            post_data["cmd"] = "beatmaplist";
-            post_data["type"] = "search";
-            post_data["limit"] = 100;
-            post_data["class"] = 1;
-            post_data["mode"] = mode == 1 ? mode : 15;
-            post_data["stars"] = json::array({min_diff, max_diff});
-            // post_data["random"] = true;
-
-            char buffer[1024];
-            // sprintf_s(
-            //    buffer, 1024, "给阁下推荐的难度：%.2lf~%.2lf", min_diff, max_diff);
-            // this->result = buffer;
-            std::string response;
-            long status_code =
-                Sayobot::NetConnection::Post(SAYO_API, response, post_data);
-            if (status_code != 200) {
-                char msg[1024];
-                sprintf(msg, "%s\nStatus Code: %ld", SAYO_API, status_code);
-                throw Sayobot::NetException(msg, status_code);
-            }
-            json receive_data = json::parse(response);
-            std::random_device rd;
-            std::default_random_engine random(rd());
-            json beatmaplist = receive_data["data"];
-            std::uniform_int_distribution<int> u(0, beatmaplist.size() - 1);
-            unsigned sid = beatmaplist[u(random)]["sid"].get<unsigned>();
-            std::vector<osu_api::beatmap_info> binfo(0);
-            osu_api::api_v1::GetBeatmapset(sid, binfo);
-            for (auto it : binfo) {
-                if (it.stars > min_diff && it.stars < max_diff) {
-                    sprintf_s(buffer,
-                              1024,
-                              "%s - %s\n"
-                              "stars: %.2f aim: %.2f speed: %.2f\n"
-                              "creator: %s\n\n"
-                              "下载链接:\n"
-                              "https://osu.ppy.sh/beatmapsets/%d\n"
-                              "https://osu.sayobot.cn/?search=%d\n\n"
-                              "（图片还在制作中...）",
-                              it.title.c_str(),
-                              it.artist.c_str(),
-                              it.stars,
-                              it.aim_stars,
-                              it.speed_stars,
-                              it.creator.c_str(),
-                              it.beatmapset_id,
-                              it.beatmapset_id);
-                    this->result = buffer;
-                }
-            }
-            // std::cout << receive_data.dump(2) << std::endl;
-        }
-
-        void Report() {
-            // if (this->group)
-            //{
-            //    this->result = "请私聊小夜report哦";
-            //    return;
-            //}
-            std::string msg;
-            if (1 != this->args.size()) {
-                for (auto it = this->args.begin(); it != this->args.end(); ++it) {
-                    msg += *it;
-                    msg += ' ';
-                }
-                msg = msg.substr(0, msg.size() - 1);
-            } else {
-                msg = this->args[0];
-            }
-            // send_private_message(SAYOKO, msg);
-            std::ofstream report("../log/v2/report.txt", std::ios::app);
-            report << this->sender << " - " << msg << std::endl;
-            report.close();
-            this->result = "阁下的意见已经报告给麻麻惹";
-        }
-
-        void Reset() {
-            auto db = Sayobot::Database::GetInstance();
-            if (!db->UserExist(this->sender)) {
-                throw Sayobot::UserNotFound(
-                    "阁下还没绑定哦，用set把阁下的名字告诉我吧",
-                    Sayobot::USER_SELF_NOT_SET);
-            }
-            const std::set<std::string> fields = {"Sign",
-                                                  "background",
-                                                  "profileEdge",
-                                                  "dataEdge",
-                                                  "SignEdge",
-                                                  "profilefont",
-                                                  "datafont",
-                                                  "signfont",
-                                                  "namefont",
-                                                  "timefont",
-                                                  "arrowfont",
-                                                  "customdownfont",
-                                                  "profilefontcolor",
-                                                  "namefontcolor",
-                                                  "bpdetailskin",
-                                                  "arrowupfontcolor",
-                                                  "arrowdownfontcolor",
-                                                  "timecolor",
-                                                  "opacity"};
-            for (auto it = fields.begin(); it != fields.end(); ++it) {
-                db->UserResetConfig(this->sender, *it);
-            }
-
-            this->result = "已经恢复到初始状态了哦";
-        }
-
-        void sudo() {
-            if (Command::sudoers.count(this->sender) == 0) {
-                this->result = "";
-                return;
-            }
-
-            Sayobot::Sudo p = Sayobot::Sudo(this->args);
-            this->result = p.GetResult();
-            cq::utils::string_trim(this->result);
-            while (this->result[0] == '\n') this->result.erase(0, 1);
-        }
-
-        void groupSleep() {
-            if (this->group != 0) {
-                double hours = 6;
-                if (this->args.size() != 0) {
-                    std::string hours_str = this->args[0];
-                    try {
-                        hours = std::stod(hours_str);
-                        if (hours > 10 || hours < 0) hours = 6;
-                    } catch (...) {
-                        hours = 6;
-                    }
-                }
-                if (cq::can_send_record()) {
-                    cq::send_message(this->target,
-                                     cq::message::MessageSegment::record(
-                                         "sayobot_records/oyasumi.mp3"));
-                }
-                cq::set_group_ban(this->group, this->sender, hours * 60 * 60);
-            }
-        }
-
-        void UpdateFontColor() {
-            const std::vector<std::string> fonttype = {
-                "Time", "Name", "Profile", "Data", "Sign"};
-        }
-
-        void UpdateFont() {
-            const std::vector<std::string> fonttype = {
-                "Time", "Name", "Profile", "Data", "Sign"};
-        }
-
-        void zalgo() {
-            if (this->args.size() != 0)
-                this->result =
-                    zalgo::zalgo(this->args[0], zalgo::zalgo_opt::normal, 2);
-            else
-                this->result = "";
-        }
-
-        static std::string llToString(int64_t n) {
-            const char digit[4] = {' ', 'K', 'M', 'G'};
-            long double v = n;
-            int a = 0;
-            while (v > 1000.0) {
-                v /= 1000.0;
-                ++a;
-            }
-            char *buf = new char[20];
-            sprintf_s(buf, 20, "%.2Lf", v);
-            std::string ret(buf);
-            delete[] buf;
-            return ret + digit[a];
-        }
-
-        static std::string DoubleRound2(double a) {
-            char *buf = new char[20];
-            sprintf_s(buf, 20, "%.2lf", a);
-            std::string ret(buf);
-            delete[] buf;
-            return ret;
-        }
-
-        static bool fileExist(const std::string &path) {
-            struct stat buffer;
-            return (stat(path.c_str(), &buffer) == 0);
+            return "[CQ:image, file=file://" + outputImagePath + "]";
         }
     };
 
-    const std::set<int64_t> Command::sudoers = {SAYOKO, DEBUGGER, COLA};
-    const std::vector<std::string> Command::Commands = {"o",
-                                                        "t",
-                                                        "c",
-                                                        "m",
-                                                        "set",
-                                                        "unset",
-                                                        "help",
-                                                        "更新框框",
-                                                        "更新个签",
-                                                        "更换背景",
-                                                        "更改透明度",
-                                                        "更新头像",
-                                                        "roll",
-                                                        "report",
-                                                        "重置",
-                                                        "sudo",
-                                                        "sleep",
-                                                        "recommend",
-                                                        "zalgo"};
 } // namespace Sayobot
-
-#endif

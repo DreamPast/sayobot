@@ -12,3 +12,10 @@ scripts/install.ps1
 *.dylib
 data/
 colors.xml
+node_modules/
+png/
+*.js.map
+*.d.ts
+*.js
+!.eslintrc.js
+*.log
