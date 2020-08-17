@@ -1,0 +1,1 @@
+g++ syb.cpp -o libsyb.so -shared -fPIC -O3 `/usr/local/bin/Magick++-config --cppflags --cxxflags --ldflags --libs`
