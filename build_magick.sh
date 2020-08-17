@@ -1,7 +1,5 @@
-sudo apt-get install libfreetype-dev
-sudo apt-get install libpng-dev
-sudo apt-get install libjpeg-dev
+apt-get install libfreetype-dev libpng-dev libjpeg-dev -y
 cd ImageMagick
 ./configure
 make
-sudo make install
+make install

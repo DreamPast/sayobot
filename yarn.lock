@@ -117,7 +117,7 @@
   dependencies:
     "@types/koa" "*"
 
-"@types/koa@*":
+"@types/koa@*", "@types/koa@^2.11.3":
   version "2.11.3"
   resolved "https://registry.yarnpkg.com/@types/koa/-/koa-2.11.3.tgz#540ece376581b12beadf9a417dd1731bc31c16ce"
   integrity sha512-ABxVkrNWa4O/Jp24EYI/hRNqEVRlhB9g09p48neQp4m3xL1TJtdWk2NyNQSMCU45ejeELMQZBYyfstyVvO2H3Q==
@@ -584,17 +584,19 @@ koa@^2.13.0:
     type-is "^1.6.16"
     vary "^1.1.2"
 
-koishi-core@^2.0.0-beta.10:
-  version "2.0.0-beta.10"
-  resolved "https://registry.yarnpkg.com/koishi-core/-/koishi-core-2.0.0-beta.10.tgz#6589ceed17e550272481e4fddd807be09ef55661"
-  integrity sha512-lE93ksNkjjxjuJsWoDpj7GJh9NiLpAnfR7wRKtr3Ql/6aARWjDtseuT6rHovMVmlQ1ykM88FN2qfIInDJchKDg==
+koishi-core@^2.0.0-beta.11:
+  version "2.0.0-beta.11"
+  resolved "https://registry.yarnpkg.com/koishi-core/-/koishi-core-2.0.0-beta.11.tgz#14fdb0173b013d15e8a7f657832f4a0611291e33"
+  integrity sha512-NevkInaV5WXnO/WjX2OU3U93bSQYgZy8u3PVIOa4bgnGEmGcUhBpyWqXpcvulneW5yoZpz7eqgHuCtV43hKAwA==
   dependencies:
+    "@types/koa" "^2.11.3"
     "@types/koa-bodyparser" "^4.3.0"
+    "@types/koa-router" "^7.4.1"
     escape-string-regexp "^4.0.0"
     koa "^2.13.0"
     koa-bodyparser "^4.3.0"
     koa-router "^9.1.0"
-    koishi-utils "^2.2.0"
+    koishi-utils "^3.0.0"
     leven "^3.1.0"
 
 koishi-plugin-mongo@^1.0.0-beta.0:
@@ -604,10 +606,10 @@ koishi-plugin-mongo@^1.0.0-beta.0:
   dependencies:
     mongodb "^3.6.0"
 
-koishi-utils@^2.2.0:
-  version "2.2.0"
-  resolved "https://registry.yarnpkg.com/koishi-utils/-/koishi-utils-2.2.0.tgz#1fa88d51fbb1c78640d14407cede9c78f5120726"
-  integrity sha512-a7xW+P0a3LC3GoBELPuUOCoFmmqo7gP/XAc74BOHoeLhU61rkVCgxxkUcclgeSKBiLntvfVTFX/6MvAIaWKhag==
+koishi-utils@^3.0.0:
+  version "3.0.0"
+  resolved "https://registry.yarnpkg.com/koishi-utils/-/koishi-utils-3.0.0.tgz#b8c7d3c92563b464d302eaf91c61aba24f736394"
+  integrity sha512-O33S/RKKzTJ9z3tUomx+bBIHrFF23Q9Ga4S3vXdRf3PWczb1bvEPYwKcgwtGukRZrZ+BqB9BSTr68Fzrj62bUQ==
   dependencies:
     supports-color "^7.1.0"
 

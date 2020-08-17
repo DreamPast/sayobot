@@ -1,0 +1,1 @@
+g++-7 core.cpp -o sayobot.so -shared -fPIC -O3 `/usr/local/bin/Magick++-config --cppflags --cxxflags --ldflags --libs` --std=c++17
